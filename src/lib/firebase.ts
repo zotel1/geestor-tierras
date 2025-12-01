@@ -12,7 +12,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID!,
 };
 
-// Evitar inicializar Firebase más de una vez
 if (!getApps().length) {
   app = initializeApp(firebaseConfig);
 } else {
