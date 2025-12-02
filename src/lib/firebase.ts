@@ -1,5 +1,6 @@
 import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 let app: FirebaseApp;
 
@@ -19,3 +20,5 @@ if (!getApps().length) {
 }
 
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+
