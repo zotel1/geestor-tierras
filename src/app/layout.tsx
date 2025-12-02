@@ -1,11 +1,29 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
+import ProtectedRoute from "@/components/ProtectedRoute";
+import { usePathname } from "next/navigation";
 
 export const metadata: Metadata = {
   title: "Gestor de Tierras Abonadas",
-  description: "CRUD en Next + Firebase",
+  description: "Dashboard de pedidos y gestión de tierras abonadas",
 };
+
+function LayoutContent({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isAuthPage = pathname === "/login";
+
+  if (isAuthPage) {
+    return <>{children}</>;
+  }
+
+  return (
+  <ProtectedRoute>
+    <Navbar />
+    <main className="pt-16 px-4 max-w-6xl mx-auto">{children}</main>
+    </ProtectedRoute>
+    );
+  }
 
 export default function RootLayout({
   children,
@@ -15,8 +33,8 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className="bg-gray-100 min-h-screen">
-        <Navbar />
-        <main className="pt-16 px-4 max-w-4xl mx-auto">{children}</main>
+        {/* @ts-expect-error Server/Client bridge */}
+        <LayoutContent>{children}</LayoutContent>
       </body>
     </html>
   );
