@@ -1,43 +1,31 @@
 "use client";
 
-import { collection, deleteDoc, doc, onSnapshot, orderBy, query, updateDoc } from "firebase/firestore";
+import Link from "next/link";
+import { deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { useEffect, useState } from "react";
-
-type Pedido = {
-    id: string;
-    calle: string;
-    numero: number;
-    cantidad: number;
-    precioUnitario: number;
-    total: number;
-    estado: "pendiente" | "entregado";
-    fecha: any;
-    clienteNombre: string | null;
-};
+import { useMemo, useState } from "react";
+import { usePedidos } from "./pedidos/PedidosProvider";
 
 export default function PedidosList() {
-    const [pedidos, setPedidos] = useState<Pedido[]>([]);
-    const [loading, setLoading] = useState(true);
+    const { pedidos, loading } = usePedidos();
+    const [q, setQ] = useState("");
 
-    useEffect(() => {
-        const q = query(
-            collection(db, "pedidos"), 
-            orderBy("estado", "asc"),
-            orderBy("fecha", "desc")
-        );
+    const filtrados = useMemo(() => {
+        const term = q.trim().toLowerCase();
+        if (!term) return pedidos;
 
-        const unsub = onSnapshot(q, (snapshot) => {
-            const data: Pedido[] = snapshot.docs.map((doc) => ({
-                id: doc.id,
-                ...(doc.data() as Omit<Pedido, "id">),
-                }));
-                setPedidos(data);
-                setLoading(false);
-            });
-
-        return () => unsub();
-    }, []);
+        return pedidos.filter((p) => {
+            const cliente = (p.clienteNombre ?? "").toLowerCase();
+            const calle = (p.calle ?? "").toLowerCase();
+            const nro = String(p.numero ?? "");
+            return (
+                cliente.includes(term) ||
+                calle.includes(term) ||
+                nro.includes(term) || 
+                `${calle} ${nro}`.includes(term)
+            );
+        });
+    }, [pedidos, q]);
 
     const marcarEntregado = async (id: string) => {
         await updateDoc(doc(db, "pedidos", id), { 
@@ -56,46 +44,86 @@ if (loading) {
 
 return (
     <div className="space-y-4">
-        {pedidos.map((p) => (
-            <div key={p.id} 
-            className="bg-[#f5f1e8] border border-[#6d4c41]/30 rounded-xl p-4 shadow-sm flex justify-between items-center">
+        {/* buscador */}
+        <div className="bg-white border border-[#6d4c41]/15 rounded-2xl p-4 shadow-sm">
+        <label className="text-sm font-semibold text-[#6d4c41]">Buscar</label>
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Ej: calle A, 10, Juan…"
+          className="mt-2 w-full px-4 py-2 rounded-xl border border-[#6d4c41]/25 focus:outline-none focus:ring-2 focus:ring-[#c8e6c9]"
+        />
+      </div>
+
+      {/* lista */}
+      {filtrados.length === 0 ? (
+        <div className="bg-white rounded-2xl p-4 border border-[#6d4c41]/15">
+          <p className="text-[#6d4c41]">No hay pedidos para mostrar.</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {filtrados.map((p) => (
+            <div
+              key={p.id}
+              className="bg-white border border-[#6d4c41]/15 rounded-2xl p-4 shadow-sm"
+            >
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div>
-                    <h3 className="font-bold text-[#2f7d32]">
-                        {p.clienteNombre ?? "Pedido"} - Calle {p.calle} N° {p.numero}</h3>
-                    <p className="text-sm text-[#6d4c41]">
-                        {p.cantidad} x ${p.precioUnitario} ={" "}
-                        <span className="font-semibold">${p.total}</span>
-                        </p>
-                        <p className="text-xs">
-                            Estado:{" "}
-                            <span className={
-                                p.estado === "pendiente"
-                                ? "text-yellow-700"
-                                : "text-green-700"
-                            }>
-                                {p.estado}
-                            </span>
-                        </p>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-extrabold text-[#2f7d32]">
+                      {p.clienteNombre ?? "Pedido"} – Calle {p.calle} #{p.numero}
+                    </h3>
+                    <span
+                      className={
+                        p.estado === "pendiente"
+                          ? "text-xs font-bold px-2 py-1 rounded-full bg-yellow-100 text-yellow-800"
+                          : "text-xs font-bold px-2 py-1 rounded-full bg-[#c8e6c9] text-[#2f7d32]"
+                      }
+                    >
+                      {p.estado}
+                    </span>
+                  </div>
+
+                  <p className="text-sm text-[#6d4c41] mt-1">
+                    {p.cantidad} × ${p.precioUnitario} ={" "}
+                    <span className="font-semibold">${p.total}</span>
+                  </p>
+
+                  <p className="text-xs text-[#6d4c41]/70 mt-1">
+                    Fecha:{" "}
+                    {p.fecha?.toDate ? p.fecha.toDate().toLocaleString("es-AR") : "-"}
+                  </p>
                 </div>
 
-                <div className="flex gap-2">
-                    {p.estado === "pendiente" && (
-                        <button
-                            onClick={() => marcarEntregado(p.id)}
-                            className="px-3 py-1 rounded-lg bg-green-600 text-while text-sm hover:bg-green-700"
-                            >
-                                Entregar
-                            </button>
-                    )}
+                <div className="flex flex-wrap gap-2">
+                  <Link
+                    href={`/pedido/${p.id}`}
+                    className="px-3 py-2 rounded-xl text-sm font-semibold bg-[#f5f1e8] border border-[#6d4c41]/20 text-[#6d4c41] hover:bg-[#c8e6c9] hover:text-[#2f7d32] transition"
+                  >
+                    Detalle
+                  </Link>
+
+                  {p.estado === "pendiente" && (
                     <button
-                        onClick={() => eliminarPedido(p.id)}
-                        className="px-3 py-1 rounded-lg bg-red-600 text-while text-sm hover:bg-red-700"
-                        >
-                        Eliminar
-                        </button>
+                      onClick={() => marcarEntregado(p.id)}
+                      className="px-3 py-2 rounded-xl text-sm font-semibold bg-[#2f7d32] text-white hover:bg-[#256628] transition"
+                    >
+                      Entregar
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => eliminarPedido(p.id)}
+                    className="px-3 py-2 rounded-xl text-sm font-semibold bg-[#c62828] text-white hover:bg-[#a61f1f] transition"
+                  >
+                    Eliminar
+                  </button>
                 </div>
+              </div>
             </div>
-        ))}
+          ))}
+        </div>
+      )}
     </div>
-);
+  );
 }
